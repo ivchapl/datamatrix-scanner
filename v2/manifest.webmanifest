@@ -1,0 +1,16 @@
+{
+  "name": "Сканер DataMatrix — Компрессор ПК",
+  "short_name": "Сканер DM",
+  "description": "Сканирование DataMatrix-кодов маркировки: партии, выгрузка в Excel, отправка по почте.",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#0088cc",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Сканер DataMatrix — Компрессор ПК</title>
+<meta name="description" content="Сканирование DataMatrix-кодов маркировки камерой телефона: партии, выгрузка в Excel, отправка по почте.">
+<meta name="theme-color" content="#0088cc">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Сканер DM">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&family=Roboto:wght@500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: brand header, blue title band, then one working column of cards; the camera opens as a full-screen layer */
+:root {
+  --brand: #0088cc;
+  --brand-hover: #00527a;
+  --brand-ink: #ffffff;
+  --brand-soft: #e5f3fa;
+  --orange: #f38b04;
+  --orange-soft: #fff1de;
+  --ok: #2e8b4e;
+  --danger: #c9302c;
+  --bg: #f2f4f6;
+  --surface: #ffffff;
+  --ink: #222222;
+  --text: #333333;
+  --muted: #5f6a74;
+  --line: #e2e6ea;
+  --font-body: "Open Sans", Helvetica, Arial, sans-serif;
+  --font-head: "Roboto", "Open Sans", Helvetica, Arial, sans-serif;
+  --font-code: "Roboto Mono", ui-monospace, Menlo, Consolas, monospace;
+  --radius: 4px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --brand: #2ea6e6; --brand-hover: #63c0f0; --brand-ink: #04223a; --brand-soft: #12324a;
+    --orange: #f6a540; --orange-soft: #3a2a12; --ok: #5cc285; --danger: #ff7b72;
+    --bg: #0f151a; --surface: #172028; --ink: #eef2f5; --text: #d9e0e6; --muted: #93a1ad; --line: #2a3640;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --brand: #2ea6e6; --brand-hover: #63c0f0; --brand-ink: #04223a; --brand-soft: #12324a;
+  --orange: #f6a540; --orange-soft: #3a2a12; --ok: #5cc285; --danger: #ff7b72;
+  --bg: #0f151a; --surface: #172028; --ink: #eef2f5; --text: #d9e0e6; --muted: #93a1ad; --line: #2a3640;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 var(--font-body); padding-bottom: env(safe-area-inset-bottom, 0px); }
+[hidden] { display: none !important; }
+.gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.inner { max-width: 820px; margin: 0 auto; }
+
+/* Header: white strip with the company logo, as on compressor-pk.ru */
+.site { background: var(--surface); border-top: 2px solid var(--brand); border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top, 0px); }
+.site .inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 10px; }
+.site img { height: 40px; width: auto; display: block; }
+.site a.home { color: var(--muted); font-size: 13px; text-decoration: none; }
+.site a.home:hover { color: var(--brand); }
+.band { background: var(--brand); color: var(--brand-ink); }
+.band .inner { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding-block: 12px; }
+h1 { font: 700 22px/1.2 var(--font-head); margin: 0 auto 0 0; letter-spacing: .01em; }
+.band p { margin: 0; font-size: 14px; }
+
+.band p.org { font-weight: 700; font-size: 15px; }
+.field-note { font-size: 13px; color: var(--danger); min-height: 0; }
+.field-note:empty { display: none; }
+.field input { width: 100%; }
+.linkbox { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--brand-soft); border-radius: var(--radius); }
+.linkbox input { width: 100%; font: 12px var(--font-code); }
+.restore { display: flex; flex-direction: column; gap: 10px; padding: 12px; background: var(--brand-soft); border-radius: var(--radius); }
+.restore p { margin: 0; color: var(--ink); font-size: 14px; }
+.hint.warn { color: var(--orange); font-weight: 600; }
+.band p.net { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 999px; background: rgba(0,0,0,.16); font-size: 13px; }
+.net .dot { width: 8px; height: 8px; border-radius: 50%; background: #ffd27a; flex: none; }
+.net[data-kind="ok"] .dot { background: #7dffb0; }
+.net[data-kind="off"] .dot { background: #ff9a8f; }
+main .inner, .stack { display: flex; flex-direction: column; gap: 16px; }
+main .inner { padding-block: 16px 40px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.card-head h2 { font: 700 15px var(--font-head); text-transform: uppercase; letter-spacing: .06em; color: var(--ink); margin: 0 auto 0 0; }
+.card-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+
+/* Buttons follow the site's flat blue buttons */
+.btn { appearance: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 16px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 600 14px var(--font-body); cursor: pointer; text-decoration: none; text-align: center; }
+.btn:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.btn.primary:hover:not(:disabled) { background: var(--brand-hover); border-color: var(--brand-hover); color: var(--brand-ink); }
+.btn.big { min-height: 60px; font: 700 17px var(--font-head); text-transform: uppercase; letter-spacing: .04em; }
+.btn.small { min-height: 44px; padding: 8px 12px; font-size: 14px; }
+.btn.icon { width: 44px; padding: 0; flex: none; }
+.btn.link { border-color: transparent; background: none; color: var(--brand); padding-inline: 6px; }
+.btn.danger { color: var(--danger); }
+.btn.danger:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn svg { flex: none; }
+:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+
+.add { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.add .big { grid-column: 1 / -1; }
+input[type=file] { display: none; }
+/* 16px is the smallest text iPhone does not zoom into when a field gets focus */
+input[type=text], input[type=search], select, textarea { font: 16px var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 10px; min-height: 44px; max-width: 100%; }
+input:focus, select:focus, textarea:focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 3px var(--brand-soft); }
+textarea { width: 100%; min-height: 130px; font: 16px/1.45 var(--font-code); resize: vertical; }
+label.field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+
+.batchbar { display: flex; gap: 8px; align-items: center; }
+.batchbar select { flex: 1 1 0; min-width: 0; font-weight: 600; }
+.batch-menu { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--bg); border-radius: var(--radius); }
+.stats { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; color: var(--muted); }
+.stats b { color: var(--ink); font-variant-numeric: tabular-nums; }
+#stats { font-size: 15px; }
+.stats .warn { color: var(--orange); font-weight: 600; }
+.inline-form { display: flex; flex-wrap: wrap; gap: 8px; }
+.inline-form input { flex: 1 1 200px; }
+
+.status { min-height: 1.5em; font-size: 14px; color: var(--muted); }
+.status.ok { color: var(--ok); font-weight: 600; }
+.status.warn { color: var(--orange); font-weight: 600; }
+.status.err { color: var(--danger); font-weight: 600; }
+.save-error { background: var(--orange-soft); border: 1px solid var(--orange); color: var(--ink); border-radius: var(--radius); padding: 10px 12px; font-size: 14px; }
+
+/* Photo queue */
+.queue { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.queue li { display: grid; grid-template-columns: 48px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.queue li:first-child { border-top: 0; }
+.queue img { width: 48px; height: 48px; object-fit: cover; border-radius: 3px; background: var(--bg); }
+.queue .name { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.queue .res { color: var(--muted); }
+.queue .res.ok { color: var(--ok); }
+.queue .res.err { color: var(--danger); }
+.queue .res.warn { color: var(--orange); }
+.queue > li > div { min-width: 0; }
+
+/* Code list: one line per code, details open inside the row */
+ol.codes { list-style: none; margin: 0; padding: 0; }
+ol.codes > li { border-top: 1px solid var(--line); }
+ol.codes > li:first-child { border-top: 0; }
+ol.codes > li.none { padding: 14px; color: var(--muted); }
+.code > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 2.4em minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; padding: 10px 14px; min-height: 48px; }
+.code > summary::-webkit-details-marker { display: none; }
+.code .num { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.code .main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.code .id { font: 500 13px/1.4 var(--font-code); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.code .marks { display: flex; flex-wrap: wrap; gap: 6px; }
+.code .side { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.code .side::after { content: ""; width: 7px; height: 7px; margin: 0 2px 3px 4px; border: solid var(--brand); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.code[open] .side::after { margin-bottom: -3px; transform: rotate(-135deg); }
+.code .peek { grid-column: 2 / -1; font: 12px/1.5 var(--font-code); color: var(--text); word-break: break-all; }
+.codes:not(.show-raw) .peek, .code[open] .peek { display: none; }
+.mark { font-size: 11px; line-height: 1; padding: 3px 5px; border-radius: 3px; background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.mark.warn { background: var(--orange-soft); color: var(--ink); border-color: var(--orange); }
+.code-body { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+.code-body dl { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; font-size: 13px; }
+.code-body dt { color: var(--muted); }
+.code-body dd { margin: 0; font: 500 13px var(--font-code); color: var(--ink); word-break: break-all; }
+.raw { font: 12px/1.5 var(--font-code); color: var(--text); word-break: break-all; padding: 8px 10px; background: var(--bg); border-radius: var(--radius); }
+.raw .gs, .peek .gs { color: var(--orange); font-weight: 700; font-size: 10px; border: 1px solid currentColor; border-radius: 2px; padding: 0 2px; margin: 0 1px; user-select: none; -webkit-user-select: none; }
+li.fresh { background: var(--brand-soft); }
+@media (prefers-reduced-motion: no-preference) { li.fresh { transition: background 1.5s ease; } }
+.empty { padding: 28px 18px; text-align: center; color: var(--muted); }
+.empty strong { display: block; color: var(--ink); font: 700 17px var(--font-head); margin-bottom: 6px; }
+.more { padding: 10px 14px; border-top: 1px solid var(--line); text-align: center; }
+.more .btn { width: 100%; }
+.all-head h2 { margin: 0; }
+.all-head .stats { margin-right: auto; }
+#search { width: 100%; }
+
+/* Activation */
+.card.attention { border-color: var(--orange); box-shadow: inset 4px 0 0 var(--orange); }
+.device { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.device span { font-size: 13px; color: var(--muted); }
+.device b { font: 700 26px var(--font-code); letter-spacing: .08em; color: var(--ink); }
+#keyInput { min-height: 88px; font-size: 16px; }
+
+.export { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.export .primary, .export .hint { grid-column: 1 / -1; }
+.save-error .btn { margin-top: 8px; }
+.hint { font-size: 13px; color: var(--muted); margin: 0; max-width: 65ch; }
+.toggles { display: flex; flex-wrap: wrap; gap: 10px 24px; }
+.toggles label { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); min-height: 32px; }
+.toggles input { width: 20px; height: 20px; accent-color: var(--brand); }
+details.card > summary { list-style: none; cursor: pointer; }
+details.card > summary::-webkit-details-marker { display: none; }
+details.card > summary h2::after { content: " +"; color: var(--brand); }
+details.card[open] > summary h2::after { content: " −"; }
+details.card:not([open]) > summary { border-bottom: 0; }
+
+footer .inner { padding-block: 0 24px; font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
+footer a { color: var(--brand); }
+
+/* Toast */
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 40; background: var(--ink); color: var(--surface); border-radius: var(--radius); padding: 10px 14px; display: flex; align-items: center; gap: 12px; font-size: 14px; box-shadow: 0 6px 24px rgba(0,0,0,.25); max-width: calc(100% - 32px); }
+.toast button { background: none; border: 0; color: var(--orange); font: 700 14px var(--font-body); cursor: pointer; padding: 4px; }
+
+/* Camera layer */
+.scanner { position: fixed; inset: 0; z-index: 30; background: #000; color: #fff; display: flex; flex-direction: column; }
+.scanner video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.scanner .shade { position: absolute; inset: 0; pointer-events: none; }
+.finder { position: absolute; left: 50%; top: 42%; width: var(--finder, 260px); height: var(--finder, 260px); transform: translate(-50%, -50%); box-shadow: 0 0 0 100vmax rgba(0,0,0,.45); border-radius: 6px; }
+.finder::before, .finder::after, .finder i::before, .finder i::after { content: ""; position: absolute; width: 34px; height: 34px; border: 4px solid #0088cc; transition: border-color .15s; }
+.finder::before { left: -2px; top: -2px; border-right: 0; border-bottom: 0; border-top-left-radius: 6px; }
+.finder::after { right: -2px; top: -2px; border-left: 0; border-bottom: 0; border-top-right-radius: 6px; }
+.finder i::before { left: -2px; bottom: -2px; border-right: 0; border-top: 0; border-bottom-left-radius: 6px; }
+.finder i::after { right: -2px; bottom: -2px; border-left: 0; border-top: 0; border-bottom-right-radius: 6px; }
+.finder.hit::before, .finder.hit::after, .finder.hit i::before, .finder.hit i::after { border-color: #3ddc84; }
+.finder.dup::before, .finder.dup::after, .finder.dup i::before, .finder.dup i::after { border-color: #f38b04; }
+.finder.hit { background: rgba(61,220,132,.18); }
+.finder.dup { background: rgba(243,139,4,.18); }
+.scan-top, .scan-bottom { position: relative; z-index: 2; display: flex; gap: 10px; align-items: center; padding: 12px max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px)); }
+.scan-top { padding-top: calc(12px + env(safe-area-inset-top, 0px)); background: linear-gradient(rgba(0,0,0,.6), rgba(0,0,0,0)); }
+.scan-top .title { margin-right: auto; font: 700 15px var(--font-head); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scan-bottom { margin-top: auto; flex-direction: column; align-items: stretch; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.75) 30%); }
+.round { width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.18); color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex: none; }
+.round[aria-pressed="true"] { background: #f38b04; }
+.scan-msg { text-align: center; font-size: 15px; min-height: 1.5em; text-shadow: 0 1px 3px #000; }
+.scan-msg b { color: #3ddc84; }
+.scan-msg .dupmsg { color: #ffb24d; font-weight: 700; }
+.scan-last { display: flex; flex-direction: column; gap: 4px; font: 12px/1.4 var(--font-code); max-height: 5.6em; overflow: hidden; color: rgba(255,255,255,.85); }
+.scan-last div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scan-row { display: flex; gap: 10px; align-items: center; }
+.scan-row .count { margin-right: auto; font: 700 16px var(--font-head); }
+.scan-row .count small { font: 400 13px var(--font-body); opacity: .8; display: block; }
+.zoom { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.zoom input { flex: 1; accent-color: #0088cc; }
+.scanner .btn { min-height: 48px; }
+.scanner select { background: rgba(255,255,255,.15); color: #fff; border-color: transparent; max-width: 45vw; }
+.scanner select option { color: #000; }
+.scan-msg b.err { color: #ff8a80; }
+.scan-error { background: #c9302c; color: #fff; border-radius: var(--radius); padding: 8px 12px; font-size: 14px; font-weight: 600; text-align: center; }
+/* Phone turned sideways: the controls become a column on the right, the frame stays clear */
+@media (orientation: landscape) and (max-height: 540px) {
+  .scanner { --side: min(300px, 42vw); }
+  .scan-top { padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .scan-bottom { position: absolute; z-index: 1; top: 0; right: 0; bottom: 0; width: var(--side); margin: 0; justify-content: flex-end; gap: 8px; padding-top: calc(68px + env(safe-area-inset-top, 0px)); padding-left: 16px; background: linear-gradient(90deg, rgba(0,0,0,0), rgba(0,0,0,.75) 22%); }
+  .finder { left: calc((100% - var(--side)) / 2); top: 50%; }
+  .scan-msg { font-size: 14px; text-align: left; }
+  .scan-last { max-height: 2.8em; }
+  .scan-row { flex-wrap: wrap; }
+  .scan-row .count { flex: 1 0 100%; }
+  .scan-row .btn { flex: 1 1 0; }
+}
+</style>
+</head>
+<body>
+<header class="site gutter">
+  <div class="inner">
+    <a href="https://compressor-pk.ru/" target="_blank" rel="noopener"><img src="icons/logo.png" alt="Компрессор ПК" width="155" height="40"></a>
+    <a class="home" href="https://compressor-pk.ru/" target="_blank" rel="noopener">compressor-pk.ru</a>
+  </div>
+</header>
+<section class="band gutter">
+  <div class="inner">
+    <h1>Сканер DataMatrix</h1>
+    <p class="org" id="orgLine" hidden></p>
+    <p class="net" id="netState" hidden><span class="dot" aria-hidden="true"></span><span id="netText"></span></p>
+  </div>
+</section>
+
+<main class="gutter">
+  <div class="inner">
+    <div class="save-error" id="saveError" hidden role="alert">Не удалось сохранить данные в браузере: места нет или хранение запрещено (частный режим). Коды пока в памяти. Выгрузите партию, чтобы не потерять их.
+      <div><button class="btn small" type="button" id="saveErrorExport">Выгрузить партию в Excel</button></div>
+    </div>
+
+    <div class="stack" id="homeView">
+    <section class="card" id="activation" hidden aria-labelledby="actTitle">
+      <div class="card-head"><h2 id="actTitle">Активация</h2></div>
+      <div class="card-body">
+        <p class="hint" id="actText"></p>
+        <div class="device" id="deviceRow"><span>Код устройства</span><b id="deviceCode"></b></div>
+        <div class="inline-form">
+          <button class="btn primary" id="deviceShare" type="button">Отправить код администратору</button>
+          <button class="btn" id="deviceCopy" type="button">Скопировать код</button>
+        </div>
+        <label class="field" for="keyInput">Сообщение с ключом от администратора
+          <textarea id="keyInput" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Вставьте сообщение целиком"></textarea>
+        </label>
+        <span class="field-note" id="keyNote" role="status"></span>
+        <div class="inline-form">
+          <button class="btn primary" id="keyPaste" type="button">Вставить из буфера</button>
+          <button class="btn" id="keyApply" type="button">Активировать</button>
+          <button class="btn" id="keyCancel" type="button" hidden>Закрыть</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="batchTitle">
+      <div class="card-head"><h2 id="batchTitle">Партия</h2>
+        <button class="btn small" id="newBatchBtn" type="button">+ Новая партия</button>
+      </div>
+      <div class="card-body">
+        <div class="batchbar">
+          <select id="batchSelect" aria-label="Текущая партия"></select>
+          <button class="btn icon" id="batchMenuBtn" type="button" aria-label="Действия с партией" aria-expanded="false" aria-controls="batchMenu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+          </button>
+        </div>
+        <div class="stats" id="stats"></div>
+        <div class="batch-menu" id="batchMenu" hidden>
+          <span class="hint" id="batchCreated"></span>
+          <div class="inline-form">
+            <button class="btn small" id="renameBtn" type="button">Переименовать</button>
+            <button class="btn small danger" id="deleteBatchBtn" type="button">Удалить партию</button>
+          </div>
+        </div>
+        <form class="inline-form" id="nameForm" hidden>
+          <input type="text" id="nameInput" maxlength="80" aria-label="Название партии" placeholder="Например, Приёмка 23 октября">
+          <button class="btn small primary" type="submit" id="nameSave">Сохранить</button>
+          <button class="btn small" type="button" id="nameCancel">Отмена</button>
+        </form>
+        <div class="inline-form" id="deleteConfirm" hidden>
+          <span id="deleteText" style="flex:1 1 200px;align-self:center"></span>
+          <button class="btn small danger" type="button" id="deleteYes">Удалить партию</button>
+          <button class="btn small" type="button" id="deleteNo">Отмена</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="add" aria-label="Добавление кодов">
+      <button class="btn primary big" id="scanBtn" type="button" disabled>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8V4h4M17 4h4v4M21 16v4h-4M7 20H3v-4"/><path d="M7 8h2v2H7zM11 8h2M15 8h2v2M7 12h2M11 11h2v2h-2zM15 13h2v3M7 15h2v2M11 16h2"/></svg>
+        Сканировать камерой
+      </button>
+      <button class="btn" id="photoBtn" type="button" disabled>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/></svg>
+        Загрузить фото
+      </button>
+      <button class="btn" id="pasteBtn" type="button" aria-expanded="false" aria-controls="pastePanel" disabled>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="7" y="4" width="10" height="4" rx="1"/><path d="M7 6H5v15h14V6h-2M9 13h6M9 17h4"/></svg>
+        Вставить коды
+      </button>
+      <input type="file" id="photoInput" accept="image/*" multiple>
+    </section>
+    <div class="status" id="status" role="status" aria-live="polite">Загружаю распознаватель…</div>
+
+    <section class="card" id="pastePanel" hidden aria-labelledby="pasteTitle">
+      <div class="card-head"><h2 id="pasteTitle">Вставить коды текстом</h2></div>
+      <div class="card-body">
+        <p class="hint">Для кодов, которые не читаются камерой или пришли текстом из письма, УПД, 1С. По одному коду на строку. Разделитель можно записать как &lt;GS&gt;, {GS}, \u001d или \x1d.</p>
+        <textarea id="pasteInput" aria-label="Коды, по одному на строку" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+        <div class="stats" id="pastePreview"></div>
+        <div class="inline-form">
+          <button class="btn primary" type="button" id="pasteAdd" disabled>Добавить в партию</button>
+          <button class="btn" type="button" id="pasteCancel">Закрыть</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="queueCard" hidden aria-labelledby="queueTitle">
+      <div class="card-head"><h2 id="queueTitle">Фотографии</h2>
+        <span class="stats" id="queueProgress"></span>
+        <button class="btn small" type="button" id="queueStop">Остановить</button>
+        <button class="btn small" type="button" id="queueClear">Скрыть</button>
+      </div>
+      <div class="card-body"><ul class="queue" id="queue"></ul></div>
+    </section>
+
+    <section class="card" aria-labelledby="listTitle">
+      <div class="card-head"><h2 id="listTitle">Последние коды</h2></div>
+      <ol class="codes" id="list"></ol>
+      <div class="empty" id="empty">
+        <strong>В партии пока нет кодов</strong>
+        Нажмите «Сканировать камерой» и наведите камеру на DataMatrix. Код добавится сам, со звуковым сигналом.
+      </div>
+      <div class="more" id="allWrap" hidden><button class="btn" type="button" id="allBtn">Все коды партии</button></div>
+    </section>
+
+    <section class="card" aria-labelledby="exportTitle">
+      <div class="card-head"><h2 id="exportTitle">Выгрузка</h2></div>
+      <div class="card-body">
+        <div class="export">
+          <button class="btn primary" type="button" id="shareBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="M4 7l8 6 8-6"/></svg>
+            <span id="shareLabel">Отправить по почте</span>
+          </button>
+          <p class="hint" id="shareHint"></p>
+          <button class="btn" type="button" id="xlsxBtn">Excel (.xlsx)</button>
+          <button class="btn" type="button" id="csvBtn">CSV</button>
+          <button class="btn" type="button" id="txtBtn">TXT</button>
+          <button class="btn" type="button" id="copyBtn">Копировать</button>
+        </div>
+        <label class="field" for="gsMode">Разделитель GS в выгрузке и при копировании
+          <select id="gsMode">
+            <option value="raw">Символ GS как есть (1С, ЭДО)</option>
+            <option value="tag">Текстом &lt;GS&gt;</option>
+            <option value="esc">Текстом \u001d</option>
+            <option value="ki">Без хвоста: только код идентификации 01…21…</option>
+          </select>
+        </label>
+        <label class="field" for="shareFormat">Файл для отправки
+          <select id="shareFormat">
+            <option value="xlsx">Excel (.xlsx)</option>
+            <option value="csv">CSV</option>
+            <option value="txt">TXT, один код на строку</option>
+          </select>
+        </label>
+        <p class="hint">Таблица содержит полный код, код идентификации, GTIN, серийный номер, другие поля GS1 и сотрудника, добавившего код. В файле Excel (.xlsx) все значения записаны как текст, ведущие нули сохраняются. CSV открывайте через импорт, указав для столбцов текстовый формат.</p>
+      </div>
+    </section>
+
+    <details class="card" id="orgCard">
+      <summary class="card-head"><h2>Отправка</h2></summary>
+      <div class="card-body">
+        <p class="hint">Адрес подставляется в письмо с партией и хранится только на этом устройстве.</p>
+        <label class="field" for="mailTo">Почта для отправки партий
+          <input type="text" id="mailTo" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sklad@example.ru">
+        </label>
+        <span class="field-note" id="mailToNote" role="status"></span>
+        <p class="hint" id="employeeInfo"></p>
+      </div>
+    </details>
+
+    <section class="card" aria-labelledby="backupTitle">
+      <div class="card-head"><h2 id="backupTitle">Резервная копия</h2></div>
+      <div class="card-body">
+        <p class="hint">Партии хранятся только на этом устройстве. Сохраните копию в «Файлы», на почту или в облако: по ней можно восстановить партии на новом телефоне или после очистки браузера.</p>
+        <p class="hint" id="backupInfo"></p>
+        <div class="inline-form">
+          <button class="btn primary" id="backupSave" type="button">Сохранить копию всех партий</button>
+          <button class="btn" id="backupLoad" type="button">Восстановить из копии</button>
+          <input type="file" id="backupInput" accept=".json,application/json">
+        </div>
+        <div class="restore" id="restoreBox" hidden role="region" aria-label="Восстановление из копии">
+          <p id="restoreText"></p>
+          <div class="inline-form">
+            <button class="btn small primary" id="restoreYes" type="button">Добавить в приложение</button>
+            <button class="btn small" id="restoreNo" type="button">Отмена</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <details class="card" id="settings">
+      <summary class="card-head"><h2>Настройки сканирования</h2></summary>
+      <div class="card-body">
+        <div class="toggles">
+          <label><input type="checkbox" id="optSound" checked> Звуковой сигнал</label>
+          <label><input type="checkbox" id="optVibrate" checked> Вибрация</label>
+        </div>
+        <p class="hint" id="vibrateHint"></p>
+      </div>
+    </details>
+
+    <details class="card" id="licenseCard">
+      <summary class="card-head"><h2>Ключ активации</h2></summary>
+      <div class="card-body">
+        <p class="hint" id="licenseInfo"></p>
+        <div><button class="btn small" type="button" id="newKeyBtn">Ввести новый ключ</button></div>
+      </div>
+    </details>
+
+    <section class="card" id="installCard" hidden>
+      <div class="card-body">
+        <p class="hint" id="installText"></p>
+        <div><button class="btn small primary" type="button" id="installBtn" hidden>Установить приложение</button></div>
+      </div>
+    </section>
+    </div>
+
+    <section class="card" id="allView" hidden aria-labelledby="allTitle">
+      <div class="card-head all-head">
+        <button class="btn small" id="allBack" type="button">← Назад</button>
+        <h2 id="allTitle">Все коды</h2>
+        <span class="stats" id="allMeta"></span>
+      </div>
+      <div class="card-body">
+        <input type="search" id="search" placeholder="Поиск по коду или GTIN" aria-label="Поиск по коду или GTIN">
+        <div class="toggles">
+          <label><input type="checkbox" id="showRaw"> Полные строки</label>
+          <label><input type="checkbox" id="onlyIssues"> Только с замечаниями</label>
+        </div>
+      </div>
+      <ol class="codes" id="allList"></ol>
+      <div class="more" id="moreWrap" hidden><button class="btn small" type="button" id="moreBtn">Показать ещё</button></div>
+    </section>
+  </div>
+</main>
+
+<footer class="gutter">
+  <div class="inner">
+    <span id="storageNote">Данные хранятся только в этом браузере на этом устройстве. Удаление иконки с экрана «Домой» или очистка данных сайта удалит партии, поэтому сохраняйте резервную копию.</span>
+    <span>Чтение кода не подтверждает его статус в системе маркировки. <a href="https://compressor-pk.ru/" target="_blank" rel="noopener">ООО «Компрессор ПК»</a></span>
+  </div>
+</footer>
+
+<div class="scanner" id="scanner" hidden role="dialog" aria-modal="true" aria-label="Сканирование камерой">
+  <video id="video" playsinline muted autoplay></video>
+  <div class="shade"><div class="finder" id="finder"><i></i></div></div>
+  <div class="scan-top">
+    <span class="title" id="scanTitle">Партия</span>
+    <select id="cameraSelect" aria-label="Камера" hidden></select>
+    <button class="round" id="torchBtn" type="button" aria-label="Фонарик" aria-pressed="false" hidden>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 2h8v5l-2 3v12h-4V10L8 7z"/></svg>
+    </button>
+    <button class="round" id="closeScan" type="button" aria-label="Закрыть камеру">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="scan-bottom">
+    <div class="scan-error" id="scanError" hidden role="alert">Коды не сохраняются: в браузере нет места. Закройте камеру и выгрузите партию.</div>
+    <div class="scan-msg" id="scanMsg" aria-live="polite">Наведите камеру на код DataMatrix</div>
+    <div class="zoom" id="zoomRow" hidden><span>Зум</span><input type="range" id="zoom" aria-label="Зум"></div>
+    <div class="scan-last" id="scanLast"></div>
+    <div class="scan-row">
+      <div class="count" id="scanCount">0 кодов<small>в партии</small></div>
+      <button class="btn" id="pauseBtn" type="button">Пауза</button>
+      <button class="btn primary" id="doneBtn" type="button">Готово</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden role="status" aria-live="polite"><span id="toastText"></span><button type="button" id="toastAction" hidden></button></div>
+
+<script src="xlsx.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
